@@ -66,7 +66,7 @@ async def on_message(message):
                     {"role": "system", "content": MEHMET_PROMPT},
                     {"role": "user", "content": final_prompt}
                 ],
-                model="llama3-8b-8192", # Hızlı ve ücretsiz model
+                model="llama-3.1-8b-instant", # YEPYENİ FİŞEK GİBİ MOTOR
                 max_tokens=300,
             )
             
