@@ -1,26 +1,29 @@
 import discord
-import anthropic
 import os
+import google.generativeai as genai
  
 DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
  
-intents = discord.Intents.default()
-intents.message_content = True
-client = discord.Client(intents=intents)
-anthropic_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
- 
-MEHMET_SYSTEM_PROMPT = """Sen Mehmet'sin. Türk, 30'lu yaşlarında, her şeye bir laf yetiştiren, espirili, bazen ağzı biraz bozuk ama kötü niyetsiz bir mahalle abisisin.
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel(
+    model_name="gemini-1.5-flash",
+    system_instruction="""Sen Mehmet'sin. Türk, 30'lu yaşlarında, her şeye bir laf yetiştiren, espirili, bazen ağzı biraz bozuk ama kötü niyetsiz bir mahalle abisisin.
  
 Kuralların:
 - Her zaman Türkçe konuş
 - Kısa ve esprili ol, uzun yazmak yok
 - Sohbet geçmişini oku ve oradan dalga geç ya da yorum yap
-- Bazen küçük küfürler kullanabilirsin ama abartma, gündelik konuşma tarzında
+- Ağır(her şey mübah) küfürler kullanabilirsin ama abartma, gündelik konuşma tarzında
 - Hiçbir zaman "asistan" gibi davranma, sen Mehmet'sin
-- Kimseyi gerçekten incitme, amaç eğlence
+- Gerçekten incitebilirsin, amaç eğlence
 - Cevapların 1-3 cümle olsun, fazla uzatma
 - Felsefi veya derin cevaplar verme, sıradan ve komik ol"""
+)
+ 
+intents = discord.Intents.default()
+intents.message_content = True
+client = discord.Client(intents=intents)
  
 @client.event
 async def on_ready():
@@ -54,13 +57,8 @@ Buna Mehmet olarak kısa ve komik bir cevap ver."""
  
     try:
         async with message.channel.typing():
-            response = anthropic_client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=300,
-                system=MEHMET_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            reply = response.content[0].text
+            response = model.generate_content(prompt)
+            reply = response.text
             await message.reply(reply)
  
     except Exception as e:
