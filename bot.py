@@ -1,16 +1,18 @@
 import discord
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import os
 
-# V2.1 - Temiz Kurulum (Bu yorum satırı Railway'in güncellemeyi fark etmesini sağlar)
-
+# V3.0 - Yeni Google GenAI SDK Kurulumu
 DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
+# Yeni nesil client tanımlaması
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+    ai_client = genai.Client(api_key=GEMINI_API_KEY)
+else:
+    ai_client = None
 
-# Prompt biraz daha sadeleştirildi
 MEHMET_PROMPT = """Sen Mehmet'sin. Türk, 30'lu yaşlarında, espirili, bazen ağzı bozuk ama kötü niyetsiz bir mahalle abisisin.
 Kuralların:
 - Her zaman Türkçe konuş.
@@ -18,41 +20,39 @@ Kuralların:
 - Bazen hafif küfürler edebilirsin ama dozunda bırak.
 - Kısa, net ve esprili ol (1-3 cümle)."""
 
-model = genai.GenerativeModel(
-    model_name="gemini-2.0-flash", 
-    system_instruction=MEHMET_PROMPT
-)
-
 intents = discord.Intents.default()
 intents.message_content = True
-client = discord.Client(intents=intents)
+discord_client = discord.Client(intents=intents)
 
-@client.event
+@discord_client.event
 async def on_ready():
     print("=======================================")
-    print(f"SİSTEM: Mehmet abi geldi! ({client.user})")
-    
-    if not GEMINI_API_KEY:
+    print(f"SİSTEM: Mehmet abi geldi! ({discord_client.user})")
+    if not ai_client:
         print("KRİTİK HATA: API Anahtarı bulunamadı!")
     else:
-        print("SİSTEM: API Anahtarı başarıyla okundu.")
+        print("SİSTEM: Yeni Google GenAI kütüphanesi aktif ve anahtar okundu.")
     print("=======================================")
 
-@client.event
+@discord_client.event
 async def on_message(message):
-    if message.author == client.user:
+    if message.author == discord_client.user:
         return
 
-    if client.user not in message.mentions:
+    if discord_client.user not in message.mentions:
+        return
+
+    if not ai_client:
+        await message.reply("Dükkan kapalı koçum, bende anahtar yok.")
         return
 
     history = []
     async for msg in message.channel.history(limit=10, before=message):
-        if msg.author != client.user:
+        if msg.author != discord_client.user:
             history.append(f"{msg.author.display_name}: {msg.content}")
     history.reverse()
 
-    user_msg = message.content.replace(f"<@{client.user.id}>", "").strip()
+    user_msg = message.content.replace(f"<@{discord_client.user.id}>", "").strip()
     if not user_msg:
         user_msg = "(boş boş bakıyor)"
 
@@ -61,14 +61,22 @@ async def on_message(message):
 
     try:
         async with message.channel.typing():
-            response = await model.generate_content_async(final_prompt)
+            # Yeni kütüphanenin asenkron çağrı yapısı
+            response = await ai_client.aio.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=final_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=MEHMET_PROMPT,
+                )
+            )
+            
             if response.text:
                 await message.reply(response.text)
             else:
                 await message.reply("Ne diyeceğimi bilemedim kardeşim.")
                 
     except Exception as e:
-        await message.reply("Lan şalter attı, az bekleyin! (Sistem Hatası)")
+        await message.reply("Lan şalter attı, az bekleyin! (Kota veya Sistem Hatası)")
         print(f"Hata Logu: {e}")
 
-client.run(DISCORD_TOKEN)
+discord_client.run(DISCORD_TOKEN)
