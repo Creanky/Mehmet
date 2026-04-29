@@ -1,31 +1,26 @@
 import discord
 import google.generativeai as genai
 import os
-import asyncio
 
-# =============================================
-# Token'lar Railway environment variable'larından okunuyor
-# =============================================
+# V2.1 - Temiz Kurulum (Bu yorum satırı Railway'in güncellemeyi fark etmesini sağlar)
+
 DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-# =============================================
 
-# Gemini Yapılandırması
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-MEHMET_SYSTEM_PROMPT = """Sen Mehmet'sin. Türk, 30'lu yaşlarında, her şeye bir laf yetiştiren, espirili, bazen ağzı biraz bozuk ama kötü niyetsiz bir mahalle abisisin.
+# Prompt biraz daha sadeleştirildi
+MEHMET_PROMPT = """Sen Mehmet'sin. Türk, 30'lu yaşlarında, espirili, bazen ağzı bozuk ama kötü niyetsiz bir mahalle abisisin.
 Kuralların:
-- Her zaman Türkçe konuş
-- Kısa ve esprili ol, uzun yazmak yok
-- Sohbet geçmişini oku ve oradan dalga geç ya da yorum yap
-- Bazen küçük küfürler kullanabilirsin ama abartma
-- Cevapların 1-3 cümle olsun, sıradan ve komik ol"""
+- Her zaman Türkçe konuş.
+- Sohbet geçmişine bakarak cevap ver.
+- Bazen hafif küfürler edebilirsin ama dozunda bırak.
+- Kısa, net ve esprili ol (1-3 cümle)."""
 
-# Model ayarları
 model = genai.GenerativeModel(
     model_name="gemini-1.5-flash",
-    system_instruction=MEHMET_SYSTEM_PROMPT
+    system_instruction=MEHMET_PROMPT
 )
 
 intents = discord.Intents.default()
@@ -34,14 +29,14 @@ client = discord.Client(intents=intents)
 
 @client.event
 async def on_ready():
-    print("---------------------------------------")
-    print(f"Mehmet abi hazır! {client.user} olarak giriş yapıldı.")
+    print("=======================================")
+    print(f"SİSTEM: Mehmet abi geldi! ({client.user})")
     
     if not GEMINI_API_KEY:
-        print("HATA: GEMINI_API_KEY bulunamadı! Railway'i kontrol et.")
+        print("KRİTİK HATA: API Anahtarı bulunamadı!")
     else:
-        print(f"Sistem: API Anahtarı yüklendi. Başlangıcı: {GEMINI_API_KEY[:5]}...")
-    print("---------------------------------------")
+        print("SİSTEM: API Anahtarı başarıyla okundu.")
+    print("=======================================")
 
 @client.event
 async def on_message(message):
@@ -57,27 +52,23 @@ async def on_message(message):
             history.append(f"{msg.author.display_name}: {msg.content}")
     history.reverse()
 
-    user_message = message.content.replace(f"<@{client.user.id}>", "").strip()
-    if not user_message:
-        user_message = "(boş boş bakıyor)"
+    user_msg = message.content.replace(f"<@{client.user.id}>", "").strip()
+    if not user_msg:
+        user_msg = "(boş boş bakıyor)"
 
     context = "\n".join(history)
-    full_prompt = f"Geçmiş: {context}\nŞimdi {message.author.display_name} diyor ki: {user_message}"
+    final_prompt = f"Geçmiş:\n{context}\n\nKullanıcı ({message.author.display_name}) diyor ki: {user_msg}"
 
     try:
         async with message.channel.typing():
-            response = await model.generate_content_async(full_prompt)
-            
+            response = await model.generate_content_async(final_prompt)
             if response.text:
                 await message.reply(response.text)
             else:
-                await message.reply("Dilim tutuldu, bir şeyler ters gitti.")
-
+                await message.reply("Ne diyeceğimi bilemedim kardeşim.")
+                
     except Exception as e:
-        if "429" in str(e):
-            await message.reply("Lan çok konuşuyorsunuz, kafam şişti! (Kota doldu.)")
-        else:
-            await message.reply("Şalterler attı, bir şeyler ters gitti.")
-        print(f"Hata detayı: {e}")
+        await message.reply("Lan şalter attı, az bekleyin! (Sistem Hatası)")
+        print(f"Hata Logu: {e}")
 
 client.run(DISCORD_TOKEN)
